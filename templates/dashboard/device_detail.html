@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ device.device_name }} - Device Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h2 d-flex align-items-center">
+                <i class="fas fa-microchip me-3 text-primary"></i>
+                {{ device.device_name }}
+            </h1>
+            <p class="text-muted mb-0">Device ID: <code>{{ device.device_id }}</code> · Use the shared account API key below.</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/dashboard/devices/" class="btn btn-outline-secondary">
+                <i class="fas fa-chevron-left"></i> Back to Devices
+            </a>
+        </div>
+    </div>
+
+    <div class="row gy-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Device Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Status:</strong> <span class="badge {% if device.is_online %}bg-success{% else %}bg-danger{% endif %}">{% if device.is_online %}Online{% else %}Offline{% endif %}</span></p>
+                    <p><strong>Shared API Key:</strong></p>
+                    <div class="alert alert-secondary small text-break" id="apiKeyBox">{{ shared_api_key.key }}</div>
+                    <p class="text-muted small">Use this shared API key in your ESP firmware for any device registered to this account. Add appliances under this device using virtual pins like V0, V1.</p>
+                    <p><strong>Appliances:</strong> {{ appliances.count }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Add Appliance</h5>
+                </div>
+                <div class="card-body">
+                    <form id="addApplianceForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="applianceName" class="form-label">Appliance Name</label>
+                                <input type="text" class="form-control" id="applianceName" placeholder="Living Room Light" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="appliancePin" class="form-label">Virtual Pin</label>
+                                <input type="text" class="form-control" id="appliancePin" placeholder="V0" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="applianceType" class="form-label">Appliance Type</label>
+                                <select class="form-select" id="applianceType">
+                                    <option value="switch">Switch</option>
+                                    <option value="light">Light</option>
+                                    <option value="fan">Fan</option>
+                                    <option value="door">Door/Gate</option>
+                                    <option value="pump">Pump</option>
+                                    <option value="slider">Slider</option>
+                                    <option value="display">Display</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="applianceRoom" class="form-label">Room</label>
+                                <input type="text" class="form-control" id="applianceRoom" placeholder="Living Room">
+                            </div>
+                        </div>
+                    </form>
+                    <div class="mt-3">
+                        <button class="btn btn-primary" onclick="addAppliance()"><i class="fas fa-plus"></i> Add Appliance</button>
+                        <small class="d-block text-muted mt-2">When you add an appliance, it is stored under this device and controlled by its virtual pin.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Appliances</h5>
+                </div>
+                <div class="card-body">
+                    {% if appliances %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Pin</th>
+                                    <th>Type</th>
+                                    <th>Room</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for app in appliances %}
+                                <tr>
+                                    <td>{{ app.name }}</td>
+                                    <td><code>{{ app.virtual_pin }}</code></td>
+                                    <td>{{ app.get_appliance_type_display }}</td>
+                                    <td>{{ app.room|default:'—' }}</td>
+                                    <td>
+                                        <span class="badge {% if app.state == 1 %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {{ app.get_state_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info mb-0">
+                        No appliances added yet. Add your first virtual pin above (e.g. V0, V1) and the system will control it under this device.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function addAppliance() {
+    const payload = {
+        device: '{{ device.id }}',
+        name: document.getElementById('applianceName').value,
+        pin: document.getElementById('appliancePin').value,
+        virtual_pin: document.getElementById('appliancePin').value,
+        appliance_type: document.getElementById('applianceType').value,
+        room: document.getElementById('applianceRoom').value,
+    };
+
+    fetch('/devices/appliances/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(async response => {
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Unable to add appliance');
+        }
+        return data;
+    })
+    .then(data => {
+        alert(`Appliance added: ${data.name} (${data.virtual_pin})`);
+        window.location.reload();
+    })
+    .catch(error => {
+        alert('Error adding appliance: ' + error.message);
+        console.error(error);
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

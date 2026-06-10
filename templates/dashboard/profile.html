@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - MyHome IoT{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    {% if user.profile_image %}
+                    <img src="{{ user.profile_image.url }}" alt="Profile" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% else %}
+                    <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center mb-3" style="width: 150px; height: 150px;">
+                        <i class="fas fa-user text-white" style="font-size: 3rem;"></i>
+                    </div>
+                    {% endif %}
+                    <h5>{{ user.first_name }} {{ user.last_name }}</h5>
+                    <p class="text-muted mb-0">{{ user.email }}</p>
+                    <span class="badge bg-primary mt-2">{{ user.get_role_display }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Profile Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">First Name</label>
+                            <input type="text" class="form-control" value="{{ user.first_name }}" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" class="form-control" value="{{ user.last_name }}" disabled>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" value="{{ user.email }}" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-control" value="{{ user.phone|default:'' }}" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bio</label>
+                        <textarea class="form-control" disabled>{{ user.bio|default:'' }}</textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">API Keys</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info small mb-3">
+                        Shared registration API key for your account:
+                        <code class="text-break">{{ shared_api_key.key }}</code>
+                        Use this key for all devices under this account.
+                    </div>
+                    {% if api_keys %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Created</th>
+                                    <th>Last Used</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key in api_keys %}
+                                <tr>
+                                    <td>{{ key.name }}</td>
+                                    <td>{{ key.created_at|date:"Y-m-d" }}</td>
+                                    <td>{{ key.last_used_at|date:"Y-m-d H:i"|default:"Never" }}</td>
+                                    <td><span class="badge {% if key.is_active %}bg-success{% else %}bg-danger{% endif %}">{% if key.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+                                    <td><a href="#" class="btn btn-sm btn-outline-danger">Delete</a></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No API keys created yet.</p>
+                    {% endif %}
+                    <button class="btn btn-sm btn-primary mt-3"><i class="fas fa-plus"></i> Generate New API Key</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

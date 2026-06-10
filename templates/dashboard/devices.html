@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+
+{% block title %}Devices - MyHome IoT{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h2 d-flex align-items-center">
+                <i class="fas fa-microchip me-3 text-primary"></i>
+                My Devices
+            </h1>
+            <p class="text-muted mb-1">All of your devices share the same account API key. After creating a device, click View Details to add appliances using virtual pins like V0, V1, V2.</p>
+            <p class="text-muted small">Showing <strong>{{ devices|length }}</strong> device{{ devices|length|pluralize }}.</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
+                <i class="fas fa-plus"></i> Add Device
+            </button>
+        </div>
+    </div>
+    
+    <!-- Devices Grid -->
+    <div class="row" id="devicesContainer">
+        {% for device in devices %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card device-card shadow-sm border-0">
+                <div class="card-header {% if device.is_online %}bg-success{% else %}bg-danger{% endif %} text-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">{{ device.device_name }}</h6>
+                            <small class="text-light"><code>{{ device.device_id }}</code></small>
+                        </div>
+                            <span class="badge bg-light text-dark">{{ device.device_type|upper }}</span>
+                    </div>
+                </div>
+                <div class="card-body pt-2">
+                    <p class="mb-2"><small class="text-muted">Unique Device ID shown above. Device name can repeat across devices.</small></p>
+                    
+                    <div class="device-info mb-3">
+                        <div class="mb-2">
+                            <span class="text-muted">Status:</span>
+                            <span class="badge {% if device.is_online %}bg-success{% else %}bg-danger{% endif %}">
+                                {% if device.is_online %}Online{% else %}Offline{% endif %}
+                            </span>
+                        </div>
+                        
+                        <!-- Environmental fields removed: temperature/humidity -->
+                        
+                        <div class="mb-2">
+                            <span class="text-muted">Appliances:</span>
+                            <strong>{{ device.appliances.count }}</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="/dashboard/devices/{{ device.id }}/" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> View Details
+                        </a>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteDevice('{{ device.id }}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                        <small class="text-muted">Use Delete to remove a device, or View Details to add appliances under the same API key.</small>
+                    </div>
+                </div>
+                <div class="card-footer bg-light">
+                    <small class="text-muted">Last seen: {{ device.last_seen|date:"Y-m-d H:i"|default:"Never" }}</small>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info text-center" role="alert">
+                <i class="fas fa-info-circle"></i> No devices yet. <a href="#" data-bs-toggle="modal" data-bs-target="#addDeviceModal">Add your first device</a>.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Add Device Modal -->
+<div class="modal fade" id="addDeviceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Device</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addDeviceForm">
+                    <div class="mb-3">
+                        <label for="deviceId" class="form-label">Device ID</label>
+                        <input type="text" class="form-control" id="deviceId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="deviceName" class="form-label">Device Name</label>
+                        <input type="text" class="form-control" id="deviceName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="deviceType" class="form-label">Device Type</label>
+                        <select class="form-select" id="deviceType">
+                            <option value="esp8266">ESP8266</option>
+                            <option value="esp32">ESP32</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location</label>
+                        <input type="text" class="form-control" id="location">
+                    </div>
+                    <div class="alert alert-info small">
+                        Use the shared registration API key from your profile page for all devices. Each device still needs a unique Device ID.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="addDevice()">Add Device</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function addDevice() {
+    const form = {
+        device_id: document.getElementById('deviceId').value,
+        device_name: document.getElementById('deviceName').value,
+        device_type: document.getElementById('deviceType').value,
+        location: document.getElementById('location').value,
+    };
+    
+    fetch('/devices/devices/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(form)
+    })
+    .then(async response => {
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Unable to add device');
+        }
+        return data;
+    })
+    .then(data => {
+        alert('Device added successfully! Use the shared API key from your profile for your firmware.');
+        location.reload();
+    })
+    .catch(error => alert('Error adding device: ' + error));
+}
+
+function deleteDevice(deviceId) {
+    if (confirm('Are you sure you want to delete this device?')) {
+        fetch('/devices/devices/' + deviceId + '/', {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(() => {
+            alert('Device deleted successfully!');
+            location.reload();
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Rooms - MyHome IoT{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1 class="h2 mb-4"><i class="fas fa-door-open me-3"></i>Rooms & Appliances</h1>
+    
+    {% for room, info in rooms_info.items %}
+    <div class="mb-5">
+        <h3 class="text-muted border-bottom pb-3">
+            <i class="fas fa-door-open me-2"></i>{{ room }}
+            <span class="badge ms-3 {% if info.is_online %}bg-success{% else %}bg-danger{% endif %}">{% if info.is_online %}Online{% else %}Offline{% endif %}</span>
+            {% if info.last_seen %}
+                <small class="text-muted ms-3">Last seen: {{ info.last_seen|date:"Y-m-d H:i" }}</small>
+            {% endif %}
+        </h3>
+        
+        <div class="row">
+            {% for appliance in info.appliances %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card appliance-card shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div>
+                                <h6 class="card-title mb-1">{{ appliance.name }}</h6>
+                                <p class="text-muted small mb-0">{{ appliance.device.device_name }}</p>
+                            </div>
+                            <div class="appliance-icon">
+                                <i class="fas {{ appliance.icon }}"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input appliance-toggle" type="checkbox" 
+                                       {% if appliance.state == 1 %}checked{% endif %} 
+                                       data-appliance-id="{{ appliance.id }}">
+                            </div>
+                            <span class="badge {% if appliance.state == 1 %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if appliance.state == 1 %}ON{% else %}OFF{% endif %}
+                            </span>
+                        </div>
+                        
+                        <small class="text-muted">Pin: <code>{{ appliance.virtual_pin }}</code></small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-info text-center" role="alert">
+        <i class="fas fa-info-circle"></i> No appliances found. Please add devices and appliances first.
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

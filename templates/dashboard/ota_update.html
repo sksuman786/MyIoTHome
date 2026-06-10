@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}OTA Update Dashboard - MyHome IoT{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="fas fa-cloud-upload-alt"></i> OTA Firmware Update</h1>
+            <p class="text-muted">Upload and manage over-the-air firmware updates for your devices</p>
+        </div>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-upload"></i> Upload New Firmware</h5>
+                </div>
+                <div class="card-body">
+                    <form id="uploadForm" enctype="multipart/form-data" onsubmit="uploadFirmware(event)">
+                        <!-- Device Selection -->
+                        <div class="mb-3">
+                            <label for="deviceSelect" class="form-label">Target Device</label>
+                            <select class="form-select" id="deviceSelect" required>
+                                <option value="">-- Select a device --</option>
+                                {% for device in devices %}
+                                <option value="{{ device.id }}">{{ device.device_name }} ({{ device.device_id }})</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Each device gets its own firmware version</small>
+                        </div>
+
+                        <!-- Version Input -->
+                        <div class="mb-3">
+                            <label for="firmwareVersion" class="form-label">Firmware Version</label>
+                            <input type="text" class="form-control" id="firmwareVersion" 
+                                   placeholder="e.g. v1.2.3" required>
+                            <small class="text-muted">Use semantic versioning (v1.0.0 format)</small>
+                        </div>
+
+                        <!-- File Upload -->
+                        <div class="mb-3">
+                            <label for="binFile" class="form-label">Binary File (.bin)</label>
+                            <input type="file" class="form-control" id="binFile" 
+                                   accept=".bin" required>
+                            <small class="text-muted">Maximum file size: 2MB</small>
+                        </div>
+
+                        <!-- Release Notes -->
+                        <div class="mb-3">
+                            <label for="releaseNotes" class="form-label">Release Notes (Optional)</label>
+                            <textarea class="form-control" id="releaseNotes" rows="3" 
+                                      placeholder="Describe changes and improvements..."></textarea>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-upload"></i> Upload Firmware
+                        </button>
+                    </form>
+
+                    <!-- Upload Progress -->
+                    <div id="uploadProgress" style="display: none;" class="mt-3">
+                        <div class="progress" style="height: 25px;">
+                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%;">0%</div>
+                        </div>
+                        <small id="uploadStatus" class="text-muted mt-2 d-block">Uploading...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Information -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 bg-light">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Upload Information</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Supported Devices:</h6>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="fas fa-check text-success"></i> ESP8266</li>
+                        <li><i class="fas fa-check text-success"></i> ESP32</li>
+                    </ul>
+
+                    <h6>File Requirements:</h6>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="fas fa-check text-success"></i> Format: .bin (binary)</li>
+                        <li><i class="fas fa-check text-success"></i> Max Size: 2MB</li>
+                        <li><i class="fas fa-check text-success"></i> Must be compiled firmware</li>
+                    </ul>
+
+                    <h6>Supported Boards:</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-microchip"></i> ESP8266 NodeMCU</li>
+                        <li><i class="fas fa-microchip"></i> ESP8266 Wemos D1</li>
+                        <li><i class="fas fa-microchip"></i> ESP32 DevKit</li>
+                        <li><i class="fas fa-microchip"></i> ESP32-CAM</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Updates Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-list"></i> Firmware Updates</h5>
+                </div>
+                <div class="card-body">
+                    <div id="updatesList">
+                        {% if updates and updates|length > 0 %}
+                        <div class="row">
+                        {% for update in updates %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card update-card {{ update.status }}">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                <h6 class="mb-1">
+                                                    <i class="fas fa-cloud-upload-alt"></i>
+                                                    Version {{ update.version }}
+                                                </h6>
+                                                <small class="text-muted">{{ update.device_name }}</small>
+                                            </div>
+                                            <span class="status-badge status-{{ update.status }}">{{ update.status|upper }}</span>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <small class="text-muted"><i class="fas fa-calendar"></i> {{ update.created_at }}</small>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <small class="text-muted"><i class="fas fa-file"></i> {{ update.file_size }}</small>
+                                        </div>
+
+                                        {% if update.status == 'downloading' or update.status == 'pending' %}
+                                        <div class="progress mb-2" style="height: 20px;">
+                                            <div class="progress-bar" role="progressbar" style="width: {{ update.download_progress }}%;" aria-valuenow="{{ update.download_progress }}" aria-valuemin="0" aria-valuemax="100">{{ update.download_progress }}%</div>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Actions removed: Details and Download buttons intentionally omitted -->
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted text-center">No firmware updates available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details modal removed: details and download actions are not available -->
+</div>
+
+<!-- Scripts -->
+<script src="{% static 'js/ota_update.js' %}"></script>
+
+<style>
+    .update-card {
+        border-left: 4px solid #0d6efd;
+        margin-bottom: 15px;
+    }
+
+    .update-card.completed {
+        border-left-color: #198754;
+        background-color: #f1f9f6;
+    }
+
+    .update-card.failed {
+        border-left-color: #dc3545;
+        background-color: #fef5f5;
+    }
+
+    .update-card.downloading {
+        border-left-color: #ffc107;
+        background-color: #fffbf0;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .status-pending {
+        background-color: #e2e3e5;
+        color: #383d41;
+    }
+
+    .status-downloading {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .status-completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status-failed {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+</style>
+{% endblock %}

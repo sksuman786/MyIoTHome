@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - MyHome IoT{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="h2 d-flex align-items-center">
+                <i class="fas fa-th-large me-3 text-primary"></i>
+                Dashboard
+            </h1>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-primary">
+                            <i class="fas fa-microchip"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="card-title mb-0">Total Devices</h6>
+                            <h3 class="text-primary mb-0" id="totalDevices">{{ total_devices }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-success">
+                            <i class="fas fa-wifi"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="card-title mb-0">Online</h6>
+                            <h3 class="text-success mb-0" id="onlineDevices">{{ online_devices }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-danger">
+                            <i class="fas fa-power-off"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="card-title mb-0">Offline</h6>
+                            <h3 class="text-danger mb-0" id="offlineDevices">{{ offline_devices }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-info">
+                            <i class="fas fa-plug"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="card-title mb-0">Appliances</h6>
+                            <h3 class="text-info mb-0" id="totalAppliances">-</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Appliances by Room -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-home me-2"></i>Appliances Control</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="appliancesContainer">
+                        <div class="col-12 text-center py-5">
+                            <p class="text-muted"><i class="fas fa-spinner fa-spin"></i> Loading devices...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Appliance Card Template -->
+<template id="applianceCardTemplate">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card appliance-card shadow-sm border-0" data-appliance-id="[ID]">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h6 class="card-title mb-1">[NAME]</h6>
+                        <p class="text-muted small mb-0">[ROOM] - [DEVICE]</p>
+                    </div>
+                    <div class="appliance-icon">
+                        <i class="fas [ICON]"></i>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input appliance-toggle" type="checkbox" [STATE] data-appliance-id="[ID]">
+                    </div>
+                    <span class="badge [STATUS_BADGE]">[STATUS_TEXT]</span>
+                </div>
+                
+                <small class="text-muted d-block mt-3">
+                    Last updated: <span class="last-updated">[TIMESTAMP]</span>
+                </small>
+            </div>
+        </div>
+    </div>
+</template>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+});
+
+function loadDashboardData() {
+    fetch('/dashboard/api/data/')
+        .then(response => response.json())
+        .then(data => {
+            renderAppliances(data.rooms);
+            if (typeof setupApplianceToggles === 'function') {
+                setupApplianceToggles();
+            }
+        });
+}
+
+function renderAppliances(rooms) {
+    const container = document.getElementById('appliancesContainer');
+    container.innerHTML = '';
+    
+    let totalAppliances = 0;
+    
+    for (const [room, appliances] of Object.entries(rooms)) {
+        const roomSection = document.createElement('div');
+        roomSection.className = 'col-12 mb-4';
+        roomSection.innerHTML = `<h5 class="text-muted">${room}</h5>`;
+        
+        container.appendChild(roomSection);
+        
+        appliances.forEach(appliance => {
+            totalAppliances++;
+            const template = document.getElementById('applianceCardTemplate');
+            const card = document.createElement('div');
+            card.innerHTML = template.innerHTML
+                .replace('[ID]', appliance.id)
+                .replace(/\[NAME\]/g, appliance.name)
+                .replace('[ROOM]', room)
+                .replace('[DEVICE]', appliance.device_name)
+                .replace('[ICON]', appliance.icon)
+                .replace('[STATE]', appliance.state === 1 ? 'checked' : '')
+                .replace('[STATUS_TEXT]', appliance.state === 1 ? 'ON' : 'OFF')
+                .replace('[STATUS_BADGE]', appliance.state === 1 ? 'bg-success' : 'bg-secondary')
+                .replace('[TIMESTAMP]', new Date(appliance.last_updated).toLocaleTimeString());
+            
+            container.appendChild(card.firstElementChild);
+        });
+    }
+    
+    document.getElementById('totalAppliances').textContent = totalAppliances;
+}
+</script>
+{% endblock %}
