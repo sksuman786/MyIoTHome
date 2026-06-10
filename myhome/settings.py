@@ -10,6 +10,31 @@ from decouple import config, Csv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Ensure logs directory exists so Django logging handlers can open files.
+LOG_DIR = BASE_DIR / 'logs'
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+# Safely ignore duplicate DRF format-suffix converter registrations.
+# Some DRF/URL configurations register the same converter multiple
+# times which raises ValueError during import; wrap the register
+# function so repeated registrations become a no-op.
+try:
+    from django.urls import converters
+    _orig_register_converter = converters.register_converter
+
+    def _safe_register_converter(converter, name):
+        if name in getattr(converters, 'converters', {}):
+            return
+        return _orig_register_converter(converter, name)
+
+    converters.register_converter = _safe_register_converter
+except Exception:
+    # Keep going if django isn't importable yet or converters not present.
+    pass
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
 
@@ -243,7 +268,8 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'debug.log',
+            # Use string path to avoid compatibility/permission issues
+            'filename': str(LOG_DIR / 'debug.log'),
             'maxBytes': 1024 * 1024 * 15,  # 15MB
             'backupCount': 10,
             'formatter': 'verbose',
@@ -254,6 +280,16 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+# If the file handler couldn't be configured for any reason in certain
+# environments, fall back to a console handler so Django can still start.
+try:
+    import logging.config
+    logging.config.dictConfig(LOGGING)
+except Exception:
+    # Minimal fallback logging configuration
+    import logging
+    logging.basicConfig(level=logging.INFO)
 
 # Rate Limiting
 RATELIMIT_REQUESTS = config('RATELIMIT_REQUESTS', default=100, cast=int)
