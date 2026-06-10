@@ -35,6 +35,31 @@ except Exception:
     # Keep going if django isn't importable yet or converters not present.
     pass
 
+# Ensure a `drf_format_suffix` converter is present to avoid duplicate
+# registration errors when `rest_framework.urlpatterns.format_suffix_patterns`
+# is called multiple times in different modules.
+try:
+    from django.urls import converters
+    _converters = getattr(converters, 'converters', None)
+    if _converters is not None and 'drf_format_suffix' not in _converters:
+        class _DRFSuffixConverter:
+            regex = '[^/.]+'
+            def to_python(self, value):
+                return value
+            def to_url(self, value):
+                return str(value)
+
+        try:
+            converters.register_converter(_DRFSuffixConverter(), 'drf_format_suffix')
+        except Exception:
+            # If registration fails, try setting it directly in the mapping
+            try:
+                _converters['drf_format_suffix'] = _DRFSuffixConverter()
+            except Exception:
+                pass
+except Exception:
+    pass
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
 
