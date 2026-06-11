@@ -34,8 +34,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setupThemeToggle();
     loadInitialData();
 
-    // Attach toggle handlers to any appliance checkboxes on static pages like Rooms
-    if (document.querySelector('.appliance-toggle')) {
+    // Attach toggle/slider handlers to any appliance controls on static pages like Rooms
+    if (document.querySelector('.appliance-toggle') || document.querySelector('.appliance-slider')) {
         setupApplianceToggles();
     }
 });

@@ -32,16 +32,29 @@
                         </div>
                         
                         <div class="d-flex align-items-center justify-content-between mb-3">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input appliance-toggle" type="checkbox" 
-                                       {% if appliance.state == 1 %}checked{% endif %} 
-                                       data-appliance-id="{{ appliance.id }}">
-                            </div>
-                            <span class="badge {% if appliance.state == 1 %}bg-success{% else %}bg-secondary{% endif %}">
-                                {% if appliance.state == 1 %}ON{% else %}OFF{% endif %}
-                            </span>
+                            {% if appliance.appliance_type == 'slider' %}
+                                <div class="w-100 me-3">
+                                    <input type="range" class="form-range appliance-slider" min="0" max="255" value="{{ appliance.value|default:0 }}" data-appliance-id="{{ appliance.id }}">
+                                </div>
+                                <div>
+                                    <span class="badge bg-info">{{ appliance.value|default:0 }}</span>
+                                </div>
+                            {% elif appliance.appliance_type == 'display' %}
+                                <div>
+                                    <span class="badge bg-info">{{ appliance.value|default:0 }}</span>
+                                </div>
+                            {% else %}
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input appliance-toggle" type="checkbox" 
+                                           {% if appliance.state == 1 %}checked{% endif %} 
+                                           data-appliance-id="{{ appliance.id }}">
+                                </div>
+                                <span class="badge {% if appliance.state == 1 %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {% if appliance.state == 1 %}ON{% else %}OFF{% endif %}
+                                </span>
+                            {% endif %}
                         </div>
-                        
+
                         <small class="text-muted">Pin: <code>{{ appliance.virtual_pin }}</code></small>
                     </div>
                 </div>
