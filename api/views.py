@@ -154,8 +154,18 @@ def get_appliance_states(request):
         appliances = device.appliances.filter(is_active=True)
         states = {'status': 'success'}
         
+        # for appliance in appliances:
+        #     states[appliance.virtual_pin] = appliance.value if appliance.value is not None else appliance.state
+
         for appliance in appliances:
-            states[appliance.virtual_pin] = appliance.value if appliance.value is not None else appliance.state
+            if appliance.appliance_type == 'slider':
+                states[appliance.virtual_pin] = appliance.value or 0
+
+            elif appliance.appliance_type == 'display':
+                states[appliance.virtual_pin] = appliance.value or 0
+
+            else:
+                states[appliance.virtual_pin] = appliance.state
         
         return Response(states)
     except Device.DoesNotExist:
