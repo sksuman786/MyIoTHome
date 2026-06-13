@@ -412,10 +412,29 @@ def update_appliance_state(request):
             action = 'turned_on' if new_value > 0 else 'turned_off'
         else:
             new_state = int(state)
-            appliance.state = new_state
-            if appliance.value is None:
+            # appliance.state = new_state
+            # if appliance.value is None:
+            #     appliance.value = new_state
+            # action = 'turned_on' if new_state == 1 else 'turned_off'
+       
+            new_state = int(state)
+
+            if appliance.appliance_type == 'slider':
                 appliance.value = new_state
-            action = 'turned_on' if new_state == 1 else 'turned_off'
+                appliance.state = 1 if new_state > 0 else 0
+                action = 'updated'
+
+            elif appliance.appliance_type == 'display':
+                appliance.value = new_state
+                action = 'updated'
+
+            else:
+                appliance.state = new_state
+
+                if appliance.value is None:
+                    appliance.value = new_state
+
+                action = 'turned_on' if new_state == 1 else 'turned_off'    
         appliance.save()
         
         # Record history
