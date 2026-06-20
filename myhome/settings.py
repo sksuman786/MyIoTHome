@@ -325,3 +325,9 @@ AUTH_USER_MODEL = 'accounts.User'
 
 # API Configuration
 API_BASE_URL = config('API_BASE_URL', default='http://localhost:8000/api')
+
+# Firebase / FCM configuration
+# Path to service account JSON for server-to-server FCM (used by notifications.utils)
+FIREBASE_SERVICE_ACCOUNT_FILE = BASE_DIR / config('FIREBASE_SERVICE_ACCOUNT_FILE', default='serviceAccountKey.json')
+# Firebase project id (used in the HTTP v1 API URL). Can be overridden via env.
+FIREBASE_PROJECT_ID = config('FIREBASE_PROJECT_ID', default='testy-6ddf2')
