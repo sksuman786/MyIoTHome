@@ -1,5 +1,8 @@
 from django.conf import settings
 from django.utils.timezone import now
+import logging
+
+logger = logging.getLogger('notifications')
 
 
 def send_device_status_notification(user, device, new_status):
@@ -27,13 +30,13 @@ def send_device_status_notification(user, device, new_status):
                 device=device
             )
     except Exception:
-        # don't block sending push if DB write fails
-        pass
+        logger.exception('Failed to create in-app Notification')
 
     # Try to send FCM push to topic user_{user.id}
     sa_file = getattr(settings, 'FIREBASE_SERVICE_ACCOUNT_FILE', None)
     project_id = getattr(settings, 'FIREBASE_PROJECT_ID', None)
     if not sa_file or not project_id:
+        logger.info('Firebase service account or project id not configured; skipping FCM send')
         return
 
     try:
@@ -42,6 +45,7 @@ def send_device_status_notification(user, device, new_status):
         import requests
     except Exception:
         # Missing google-auth or requests
+        logger.exception('Missing google-auth or requests libraries')
         return
 
     try:
@@ -51,7 +55,7 @@ def send_device_status_notification(user, device, new_status):
         access_token = creds.token
 
         url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
-        topic = f"user_{user.id}"
+        topic = "all_devices"          #f"user_{user.id}"
 
         payload = {
             'message': {
@@ -74,15 +78,8 @@ def send_device_status_notification(user, device, new_status):
             'Content-Type': 'application/json; UTF-8'
         }
 
-        #requests.post(url, json=payload, headers=headers, timeout=10)
-        resp = requests.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=10
-       )
-        print("FCM STATUS:", resp.status_code)
-        print("FCM RESPONSE:", resp.text)
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        logger.info('FCM send status=%s response=%s', resp.status_code, resp.text)
     except Exception:
-        # Best-effort: ignore failures silently
+        logger.exception('Failed sending FCM message')
         return

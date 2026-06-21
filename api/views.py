@@ -78,7 +78,8 @@ def device_auth(request):
         try:
             send_device_status_notification(device.user, device, device.status)
         except Exception:
-            pass
+            import logging
+            logging.getLogger('notifications').exception('Error sending device auth notification')
 
         # Broadcast status update to any connected dashboards via channels
         try:
@@ -224,7 +225,8 @@ def update_device_status(request):
         try:
             send_device_status_notification(device.user, device, device.status)
         except Exception:
-            pass
+            import logging
+            logging.getLogger('notifications').exception('Error sending update_device_status notification')
         
         # Log device data (environmental fields removed)
         DeviceData.objects.create(
@@ -286,7 +288,8 @@ def device_heartbeat(request):
         try:
             send_device_status_notification(device.user, device, device.status)
         except Exception:
-            pass
+            import logging
+            logging.getLogger('notifications').exception('Error sending device_heartbeat notification')
 
         # Broadcast status update to dashboards for this user
         try:
