@@ -269,6 +269,7 @@ def device_heartbeat(request):
         "message": "Heartbeat received"
     }
     """
+    import logging
     api_key = request.data.get('api_key')
     device_id = request.data.get('device_id')
     
@@ -284,12 +285,32 @@ def device_heartbeat(request):
             raise Device.DoesNotExist
         device.last_heartbeat = now()
         device.status = 'online'
+
+        logging.getLogger('notifications').warning(
+            f"HEARTBEAT RECEIVED: {device.device_id}"
+        )
+
         device.save(update_fields=['last_heartbeat', 'status'])
+
         try:
-            send_device_status_notification(device.user, device, device.status)
-        except Exception:
-            import logging
-            logging.getLogger('notifications').exception('Error sending device_heartbeat notification')
+            logging.getLogger('notifications').warning(
+                f"SENDING NOTIFICATION: {device.device_id}"
+            )
+
+            send_device_status_notification(
+                device.user,
+                device,
+                device.status
+            )
+
+            logging.getLogger('notifications').warning(
+                "NOTIFICATION FUNCTION COMPLETED"
+            )
+
+        except Exception as e:
+            logging.getLogger('notifications').exception(
+                f'Error sending device_heartbeat notification: {e}'
+            )
 
         # Broadcast status update to dashboards for this user
         try:
