@@ -283,6 +283,8 @@ def device_heartbeat(request):
         device = get_device_by_user_api_key(api_key, device_id)
         if not device:
             raise Device.DoesNotExist
+        old_status = device.status
+
         device.last_heartbeat = now()
         device.status = 'online'
 
@@ -292,25 +294,27 @@ def device_heartbeat(request):
 
         device.save(update_fields=['last_heartbeat', 'status'])
 
-        try:
-            logging.getLogger('notifications').warning(
-                f"SENDING NOTIFICATION: {device.device_id}"
-            )
+        # Send notification only when device changes from offline -> online
+        if old_status != 'online':
+            try:
+                logging.getLogger('notifications').warning(
+                    f"SENDING ONLINE NOTIFICATION: {device.device_id}"
+                )
 
-            send_device_status_notification(
-                device.user,
-                device,
-                device.status
-            )
+                send_device_status_notification(
+                    device.user,
+                    device,
+                    'online'
+                )
 
-            logging.getLogger('notifications').warning(
-                "NOTIFICATION FUNCTION COMPLETED"
-            )
+                logging.getLogger('notifications').warning(
+                    'ONLINE NOTIFICATION SENT'
+                )
 
-        except Exception as e:
-            logging.getLogger('notifications').exception(
-                f'Error sending device_heartbeat notification: {e}'
-            )
+            except Exception as e:
+                logging.getLogger('notifications').exception(
+                    f'Error sending online notification: {e}'
+                )
 
         # Broadcast status update to dashboards for this user
         try:
