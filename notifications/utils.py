@@ -74,7 +74,15 @@ def send_device_status_notification(user, device, new_status):
             'Content-Type': 'application/json; UTF-8'
         }
 
-        requests.post(url, json=payload, headers=headers, timeout=10)
+        #requests.post(url, json=payload, headers=headers, timeout=10)
+        resp = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=10
+       )
+        print("FCM STATUS:", resp.status_code)
+        print("FCM RESPONSE:", resp.text)
     except Exception:
         # Best-effort: ignore failures silently
         return
