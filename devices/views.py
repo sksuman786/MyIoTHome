@@ -102,15 +102,21 @@ class DeviceViewSet(viewsets.ModelViewSet):
     def heartbeat(self, request, pk=None):
         """Record device heartbeat."""
         from django.utils.timezone import now
+        import traceback
+
         device = self.get_object()
         device.last_heartbeat = now()
         device.status = 'online'
         device.save(update_fields=['last_heartbeat', 'status'])
         try:
+            print("CALLING FCM...")
             send_device_status_notification(device.user, device, device.status)
-        except Exception:
-            pass
+            print("FCM COMPLETED")
+        except Exception as e:
+            print("FCM ERROR:", e)
+            traceback.print_exc()
         return Response({'message': 'Heartbeat recorded'})
+    
     
     @action(detail=True, methods=['get'])
     def history(self, request, pk=None):
