@@ -93,3 +93,4 @@ celerybeat-schedule
 
 # Migrations (be careful)
 # migrations/
+serviceAccountKey.json
