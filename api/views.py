@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
-from django.utils.timezone import now
+from django.utils.timezone import now, localtime
 
 from devices.models import Device, Appliance, ApplianceHistory, DeviceData, WaterMonitoringData, WaterPumpTimer, OTAUpdate
 from accounts.models import APIKey
@@ -97,7 +97,7 @@ def device_auth(request):
                         'status': device.status,
                         'online': device.is_online(),
                         'wifi_signal': device.wifi_signal,
-                        'last_seen': device.last_seen.isoformat() if device.last_seen else None,
+                        'last_seen': localtime(device.last_seen).isoformat() if device.last_seen else None,
                     }
                 }
             )
@@ -332,7 +332,7 @@ def device_heartbeat(request):
                         'status': device.status,
                         'online': device.is_online(),
                         'wifi_signal': device.wifi_signal,
-                        'last_heartbeat': device.last_heartbeat.isoformat() if device.last_heartbeat else None,
+                        'last_heartbeat': localtime(device.last_heartbeat).isoformat() if device.last_heartbeat else None,
                     }
                 }
             )
@@ -382,8 +382,8 @@ def system_status(request):
             'device_role': d.device_role,
             'status': d.status,
             'is_online': d.is_online(),
-            'last_heartbeat': d.last_heartbeat.isoformat() if d.last_heartbeat else None,
-            'last_seen': d.last_seen.isoformat() if d.last_seen else None,
+            'last_heartbeat': localtime(d.last_heartbeat).isoformat() if d.last_heartbeat else None,
+            'last_seen': localtime(d.last_seen).isoformat() if d.last_seen else None,
             'wifi_signal': d.wifi_signal,
             'heartbeat_timeout_seconds': d.heartbeat_timeout_seconds,
         })
