@@ -395,7 +395,7 @@ def system_status(request):
 @permission_classes([AllowAny])
 def update_appliance_state(request):
     """
-    Update appliance state from device.
+    Update appliance state from device and echo the received signal as confirmation.
     
     POST /api/device/appliance/state/
     
@@ -411,7 +411,12 @@ def update_appliance_state(request):
         "status": "success",
         "message": "Appliance state updated",
         "virtual_pin": "V0",
-        "state": 1
+        "state": 1,
+        "confirmation": {
+            "confirmed_value": 1,
+            "appliance_name": "Your appliance name",
+            "appliance_id": "..."
+        }
     }
     """
     api_key = request.data.get('api_key')
@@ -433,11 +438,13 @@ def update_appliance_state(request):
         appliance = Appliance.objects.get(device=device, virtual_pin=virtual_pin)
         
         old_state = appliance.state
+        confirmed_value = None
         if value is not None:
             new_value = int(value)
             appliance.value = new_value
             appliance.state = 1 if new_value > 0 else 0
             action = 'turned_on' if new_value > 0 else 'turned_off'
+            confirmed_value = new_value
         else:
             new_state = int(state)
             # appliance.state = new_state
@@ -451,10 +458,12 @@ def update_appliance_state(request):
                 appliance.value = new_state
                 appliance.state = 1 if new_state > 0 else 0
                 action = 'updated'
+                confirmed_value = new_state
 
             elif appliance.appliance_type == 'display':
                 appliance.value = new_state
                 action = 'updated'
+                confirmed_value = new_state
 
             else:
                 appliance.state = new_state
@@ -462,7 +471,8 @@ def update_appliance_state(request):
                 if appliance.value is None:
                     appliance.value = new_state
 
-                action = 'turned_on' if new_state == 1 else 'turned_off'    
+                action = 'turned_on' if new_state == 1 else 'turned_off'
+                confirmed_value = new_state
         appliance.save()
         
         # Record history
@@ -479,7 +489,212 @@ def update_appliance_state(request):
             'message': 'Appliance state updated',
             'virtual_pin': virtual_pin,
             'state': appliance.state,
-            'value': appliance.value
+            'value': appliance.value,
+            'confirmation': {
+                'confirmed_value': confirmed_value,
+                'appliance_name': appliance.name,
+                'appliance_id': str(appliance.id)
+            }
+        })
+    except Device.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Invalid device_id or api_key'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+    except Appliance.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': f'Appliance with virtual_pin {virtual_pin} not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def confirm_appliance_state(request):
+    """
+    Confirm relay state from the ESP device after it applies the requested state.
+
+    POST /api/device/appliance/confirm/
+
+    {
+        "api_key": "your_api_key_here",
+        "device_id": "Room2_02",
+        "virtual_pin": "V0",
+        "state": 1
+    }
+
+    Response:
+    {
+        "status": "success",
+        "message": "Appliance state confirmed by device",
+        "virtual_pin": "V0",
+        "state": 1,
+        "value": 1,
+        "confirmation": {
+            "confirmed_value": 1,
+            "appliance_name": "Your appliance name",
+            "appliance_id": "..."
+        }
+    }
+
+    GET /api/device/appliance/confirm/?api_key=...&device_id=...&virtual_pin=V0
+
+    Response:
+    {
+        "status": "success",
+        "message": "Latest appliance confirmation retrieved",
+        "virtual_pin": "V0",
+        "state": 1,
+        "value": 1,
+        "confirmed_at": "2026-06-25T12:34:56Z",
+        "confirmation": {
+            "confirmed_value": 1,
+            "action": "confirmed",
+            "appliance_name": "Your appliance name",
+            "appliance_id": "..."
+        }
+    }
+    """
+    if request.method == 'GET':
+        api_key = request.query_params.get('api_key')
+        device_id = request.query_params.get('device_id')
+        virtual_pin = request.query_params.get('virtual_pin')
+
+        if api_key is None or device_id is None or virtual_pin is None:
+            return Response({
+                'status': 'error',
+                'message': 'api_key, device_id, and virtual_pin are required for confirmation retrieval'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            device = get_device_by_user_api_key(api_key, device_id)
+            if not device:
+                raise Device.DoesNotExist
+            appliance = Appliance.objects.get(device=device, virtual_pin=virtual_pin)
+
+            history = ApplianceHistory.objects.filter(
+                appliance=appliance,
+                triggered_by='device'
+            ).order_by('-timestamp').first()
+
+            if not history:
+                return Response({
+                    'status': 'error',
+                    'message': 'No device confirmation found for this appliance'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            return Response({
+                'status': 'success',
+                'message': 'Latest appliance confirmation retrieved',
+                'virtual_pin': virtual_pin,
+                'state': appliance.state,
+                'value': appliance.value,
+                'confirmed_at': localtime(history.timestamp).isoformat() if history.timestamp else None,
+                'confirmation': {
+                    'confirmed_value': history.new_state,
+                    'action': history.action,
+                    'appliance_name': appliance.name,
+                    'appliance_id': str(appliance.id)
+                }
+            })
+        except Device.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Invalid device_id or api_key'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        except Appliance.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': f'Appliance with virtual_pin {virtual_pin} not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    api_key = request.data.get('api_key')
+    device_id = request.data.get('device_id')
+    virtual_pin = request.data.get('virtual_pin')
+    state = request.data.get('state')
+    value = request.data.get('value')
+
+    if api_key is None or device_id is None or virtual_pin is None or (state is None and value is None):
+        return Response({
+            'status': 'error',
+            'message': 'api_key, device_id, virtual_pin, and state or value are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        device = get_device_by_user_api_key(api_key, device_id)
+        if not device:
+            raise Device.DoesNotExist
+        appliance = Appliance.objects.get(device=device, virtual_pin=virtual_pin)
+
+        old_state = appliance.state
+        confirmed_value = None
+        if value is not None:
+            new_value = int(value)
+            appliance.value = new_value
+            appliance.state = 1 if new_value > 0 else 0
+            action = 'confirmed'
+            confirmed_value = new_value
+        else:
+            new_state = int(state)
+            if appliance.appliance_type == 'slider':
+                appliance.value = new_state
+                appliance.state = 1 if new_state > 0 else 0
+                action = 'confirmed'
+                confirmed_value = new_state
+            elif appliance.appliance_type == 'display':
+                appliance.value = new_state
+                action = 'confirmed'
+                confirmed_value = new_state
+            else:
+                appliance.state = new_state
+                if appliance.value is None:
+                    appliance.value = new_state
+                action = 'confirmed'
+                confirmed_value = new_state
+        appliance.save()
+
+        ApplianceHistory.objects.create(
+            appliance=appliance,
+            previous_state=old_state,
+            new_state=appliance.state,
+            action=action,
+            triggered_by='device'
+        )
+
+        # Broadcast appliance state confirmation to connected user clients.
+        try:
+            channel_layer = get_channel_layer()
+            group_name = f"devices_user_{device.user.id}_devices"
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    'type': 'appliance_state_change',
+                    'data': {
+                        'type': 'appliance_state_change',
+                        'device_id': device.device_id,
+                        'virtual_pin': virtual_pin,
+                        'appliance_id': str(appliance.id),
+                        'appliance_name': appliance.name,
+                        'state': appliance.state,
+                        'value': appliance.value,
+                        'confirmed_value': confirmed_value,
+                    }
+                }
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'status': 'success',
+            'message': 'Appliance state confirmed by device',
+            'virtual_pin': virtual_pin,
+            'state': appliance.state,
+            'value': appliance.value,
+            'confirmation': {
+                'confirmed_value': confirmed_value,
+                'appliance_name': appliance.name,
+                'appliance_id': str(appliance.id)
+            }
         })
     except Device.DoesNotExist:
         return Response({
@@ -497,7 +712,7 @@ def update_appliance_state(request):
 @permission_classes([AllowAny])
 def set_appliance_state(request):
     """
-    Request to set appliance state (called by user).
+    Request to set appliance state (called by user) with confirmation.
     
     POST /api/device/appliance/set/
     
@@ -511,9 +726,13 @@ def set_appliance_state(request):
     Response:
     {
         "status": "success",
-        "message": "Request sent to device",
+        "message": "Appliance state set successfully",
         "virtual_pin": "V0",
-        "state": 1
+        "state": 1,
+        "confirmation": {
+            "confirmed_value": 1,
+            "appliance_name": "Light"
+        }
     }
     """
     api_key = request.data.get('api_key')
@@ -542,17 +761,20 @@ def set_appliance_state(request):
         
         # Update state or numeric value
         old_state = appliance.state
+        confirmed_value = None
         if value is not None:
             new_value = int(value)
             appliance.value = new_value
             appliance.state = 1 if new_value > 0 else 0
             action = 'turned_on' if new_value > 0 else 'turned_off'
+            confirmed_value = new_value
         else:
             new_state = int(state)
             appliance.state = new_state
             if appliance.value is None:
                 appliance.value = new_state
             action = 'turned_on' if new_state == 1 else 'turned_off'
+            confirmed_value = new_state
         appliance.save()
         
         # Record history
@@ -569,7 +791,12 @@ def set_appliance_state(request):
             'message': 'Appliance state set successfully',
             'virtual_pin': virtual_pin,
             'state': appliance.state,
-            'value': appliance.value
+            'value': appliance.value,
+            'confirmation': {
+                'confirmed_value': confirmed_value,
+                'appliance_name': appliance.name,
+                'appliance_id': str(appliance.id)
+            }
         })
     except Device.DoesNotExist:
         return Response({
@@ -596,6 +823,7 @@ def api_documentation(request):
             'heartbeat': '/api/device/heartbeat/',
             'update_appliance_state': '/api/device/appliance/state/',
             'set_appliance_state': '/api/device/appliance/set/',
+            'confirm_appliance_state': '/api/device/appliance/confirm/',
             'documentation': '/api/docs/'
         }
     })

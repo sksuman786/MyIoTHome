@@ -163,7 +163,7 @@ class ApplianceViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def toggle(self, request, pk=None):
-        """Toggle appliance state."""
+        """Toggle appliance state with confirmation."""
         appliance = self.get_object()
         old_state = appliance.state
         new_state = 1 if old_state == 0 else 0
@@ -181,11 +181,19 @@ class ApplianceViewSet(viewsets.ModelViewSet):
             triggered_by_user=request.user
         )
         
-        return Response(ApplianceSerializer(appliance).data)
+        response_data = ApplianceSerializer(appliance).data
+        response_data['confirmation'] = {
+            'status': 'success',
+            'message': f"Appliance toggled successfully",
+            'confirmed_state': new_state,
+            'appliance_id': str(appliance.id),
+            'appliance_name': appliance.name
+        }
+        return Response(response_data)
     
     @action(detail=True, methods=['post'])
     def set_state(self, request, pk=None):
-        """Set appliance state or numeric value (for sliders/displays)."""
+        """Set appliance state or numeric value (for sliders/displays) with confirmation."""
         serializer = ApplianceToggleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
@@ -201,6 +209,7 @@ class ApplianceViewSet(viewsets.ModelViewSet):
             appliance.state = 1 if new_value > 0 else 0
             action = f'set_to_{new_value}'
             message = f"Appliance '{appliance.name}' set to {new_value}"
+            confirmed_value = new_value
         else:
             # Binary state for toggle
             new_state = int(serializer.validated_data['state'])
@@ -209,6 +218,7 @@ class ApplianceViewSet(viewsets.ModelViewSet):
                 appliance.value = new_state
             action = 'turned_on' if new_state == 1 else 'turned_off'
             message = f"Appliance '{appliance.name}' turned {'ON' if new_state == 1 else 'OFF'}"
+            confirmed_value = new_state
         
         appliance.save()
         
@@ -223,7 +233,15 @@ class ApplianceViewSet(viewsets.ModelViewSet):
         )
         
         response_data = ApplianceSerializer(appliance).data
-        response_data['message'] = message
+        response_data['confirmation'] = {
+            'status': 'success',
+            'message': message,
+            'confirmed_value': confirmed_value,
+            'appliance_id': str(appliance.id),
+            'appliance_name': appliance.name,
+            'previous_value': old_value,
+            'new_value': appliance.value
+        }
         return Response(response_data)
     
     @action(detail=True, methods=['get'])

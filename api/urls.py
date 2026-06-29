@@ -5,7 +5,7 @@ URL configuration for API app.
 from django.urls import path
 from api.views import (
     device_auth, get_appliance_states, update_device_status, device_heartbeat,
-    update_appliance_state, set_appliance_state, api_documentation,
+    update_appliance_state, confirm_appliance_state, set_appliance_state, api_documentation,
     save_water_monitoring_data, get_water_monitoring_data, create_pump_timer,
     get_pump_timer, start_pump_timer, get_device_pump_timer, upload_ota_update,
     get_ota_update_download, update_ota_progress, ota_check_version, system_status
@@ -29,6 +29,7 @@ urlpatterns = [
     
     # Appliance State Management
     path('device/appliance/state/', update_appliance_state, name='appliance-state'),
+    path('device/appliance/confirm/', confirm_appliance_state, name='appliance-confirm'),
     path('device/appliance/set/', set_appliance_state, name='appliance-set'),
     
     # Water Monitoring
